@@ -73,6 +73,15 @@
     .result-score span { font-size: 24px; letter-spacing: -1px; color: var(--muted); font-weight: 400; }
     .result p { font-size: 14px; color: var(--muted); }
     .result-stat { border-top: 1px solid var(--line); margin-top: 23px; padding-top: 18px; font-size: 12px; color: var(--muted); }
+    .review { text-align: center; }
+    .review h2 { margin-top: 0; }
+    .review-list { display: grid; gap: 13px; list-style: none; margin: 22px 0; padding: 0; text-align: left; }
+    .review-item { border: 1px solid var(--line); border-radius: 12px; padding: 18px; }
+    .review-item h3 { font-size: 17px; line-height: 1.4; margin: 12px 0; }
+    .review-answer { border-left: 3px solid; font-size: 13px; margin: 9px 0; padding-left: 10px; }
+    .review-answer.correct { color: var(--correct); }
+    .review-answer.wrong { color: var(--wrong); }
+    .review-fact { color: var(--text); font-size: 13px; margin: 13px 0 0; }
     [hidden] { display: none !important; }
     @keyframes float { 50% { transform: translateY(-5px) rotate(3deg); } }
     @keyframes twinkle { to { opacity: .35; } }
@@ -139,8 +148,16 @@
         <div class="result-score" id="result-score"></div>
         <p id="result-message"></p>
         <div class="result-stat" id="result-stat"></div>
+        <button class="next" id="review-answers">Review my answers</button>
         <button class="next" id="restart">Explore again <span aria-hidden="true">&rarr;</span></button>
       </div>
+      <section class="review" id="review" aria-labelledby="review-title" hidden>
+        <div class="eyebrow">Your mission, question by question</div>
+        <h2 id="review-title" tabindex="-1">Answer review</h2>
+        <ol class="review-list" id="review-list"></ol>
+        <button class="next" id="return-to-results">Return to results</button>
+        <button class="next" id="review-restart">Explore again <span aria-hidden="true">&rarr;</span></button>
+      </section>
     </section>
     <footer class="bottom">Made for curious minds <span>&middot;</span> Keep looking up <span aria-hidden="true">&#10022;</span></footer>
   </main>
@@ -161,6 +178,7 @@
     let current = 0;
     let score = 0;
     let answered = false;
+    let selectedAnswers = [];
     function updateProgress(completed) {
       document.querySelector(".progress-fill").style.width = `${completed / questions.length * 100}%`;
       document.querySelector(".progress").setAttribute("aria-valuenow", completed);
@@ -190,6 +208,7 @@
       if (answered || $("quiz").hidden) return;
       answered = true;
       const item = questions[current];
+      selectedAnswers[current] = index;
       const correct = index === item.correct;
       if (correct) score++;
       const buttons = [...$("answers").children];
@@ -219,6 +238,7 @@
     }
     function showResults() {
       $("quiz").hidden = true;
+      $("review").hidden = true;
       $("results").hidden = false;
       $("question-count").textContent = "Mission complete";
       const tier = score >= 8
@@ -234,18 +254,61 @@
       $("result-stat").textContent = `${score * 10}% accuracy · ${score} correct · ${questions.length - score} to rediscover`;
       $("result-title").focus();
     }
+    function showReview() {
+      const list = $("review-list");
+      list.replaceChildren();
+      questions.forEach((item, questionIndex) => {
+        const selectedIndex = selectedAnswers[questionIndex];
+        const isCorrect = selectedIndex === item.correct;
+        const entry = document.createElement("li");
+        entry.className = "review-item";
+        const category = document.createElement("div");
+        category.className = "category";
+        category.textContent = item.category;
+        const question = document.createElement("h3");
+        question.textContent = `${questionIndex + 1}. ${item.question}`;
+        const selected = document.createElement("p");
+        selected.className = `review-answer ${isCorrect ? "correct" : "wrong"}`;
+        selected.textContent = `Your answer: ${item.answers[selectedIndex]} (${isCorrect ? "Correct" : "Incorrect"})`;
+        const correct = document.createElement("p");
+        correct.className = "review-answer correct";
+        correct.textContent = `Correct answer: ${item.answers[item.correct]}`;
+        const fact = document.createElement("p");
+        fact.className = "review-fact";
+        fact.textContent = `Why: ${item.fact}`;
+        entry.append(category, question, selected, correct, fact);
+        list.append(entry);
+      });
+      $("results").hidden = true;
+      $("review").hidden = false;
+      $("question-count").textContent = "Answer review";
+      $("review-title").focus();
+    }
+    function returnToResults() {
+      $("review").hidden = true;
+      $("results").hidden = false;
+      $("question-count").textContent = "Mission complete";
+      $("result-title").focus();
+    }
+    function restartQuiz() {
+      current = 0;
+      score = 0;
+      selectedAnswers = [];
+      $("results").hidden = true;
+      $("review").hidden = true;
+      $("quiz").hidden = false;
+      updateProgress(0);
+      renderQuestion(true);
+    }
     $("next").addEventListener("click", () => {
       if (!answered) return;
       if (current === questions.length - 1) showResults();
       else { current++; renderQuestion(true); }
     });
-    $("restart").addEventListener("click", () => {
-      current = 0; score = 0;
-      $("results").hidden = true;
-      $("quiz").hidden = false;
-      updateProgress(0);
-      renderQuestion(true);
-    });
+    $("review-answers").addEventListener("click", showReview);
+    $("return-to-results").addEventListener("click", returnToResults);
+    $("restart").addEventListener("click", restartQuiz);
+    $("review-restart").addEventListener("click", restartQuiz);
     document.addEventListener("keydown", event => {
       if (event.altKey || event.ctrlKey || event.metaKey || event.repeat) return;
       const index = "1234".indexOf(event.key);
